@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/main.ts",
+    "import": "tsx src/main.ts",
     "start": "node dist/main.js",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
@@ -16,7 +17,8 @@
     "@english-dictionary/application": "workspace:*",
     "@english-dictionary/contracts": "workspace:*",
     "@english-dictionary/domain": "workspace:*",
-    "@english-dictionary/infrastructure": "workspace:*"
+    "@english-dictionary/infrastructure": "workspace:*",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@english-dictionary/typescript-config": "workspace:*",
