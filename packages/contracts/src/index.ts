@@ -1,1 +1,1 @@
-export const contractsPackage = '@english-dictionary/contracts';
+export { FavoriteJobs } from './favorite-jobs.js';
