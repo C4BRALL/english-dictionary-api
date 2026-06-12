@@ -19,7 +19,7 @@ export { type FavoriteRepository, type HistoryRepository } from './ports/activit
 export type { CacheStore } from './ports/cache.store.js';
 export type { DictionaryGateway } from './ports/dictionary.gateway.js';
 export type { FavoriteQueue } from './ports/favorite.queue.js';
-export type { PasswordHasher, TokenIssuer } from './ports/security.js';
+export type { PasswordHasher, TokenIssuer, TokenVerifier } from './ports/security.js';
 export type { CreateUserInput, UserRepository } from './ports/user.repository.js';
 export type { WordPage, WordRepository, WordSource } from './ports/word.repository.js';
 export { CacheKeys } from './services/cache-keys.js';

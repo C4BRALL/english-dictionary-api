@@ -8,3 +8,7 @@ export interface PasswordHasher {
 export interface TokenIssuer {
   issue(subject: UserId): Promise<string>;
 }
+
+export interface TokenVerifier {
+  verify(token: string): Promise<UserId>;
+}
