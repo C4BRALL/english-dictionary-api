@@ -36,6 +36,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/contracts/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-namespace': 'off',
+    },
+  },
+  {
     files: ['**/*.js', '**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
   },

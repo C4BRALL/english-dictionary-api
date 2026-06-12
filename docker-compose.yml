@@ -1,0 +1,104 @@
+x-application: &application
+  image: english-dictionary-api:local
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: &application-environment
+    NODE_ENV: production
+    DATABASE_URL: postgresql://dictionary:dictionary@postgres:5432/dictionary?schema=public
+    REDIS_URL: redis://redis:6379
+    JWT_SECRET: local-development-secret-with-at-least-32-characters
+    JWT_ISSUER: english-dictionary-api
+    JWT_AUDIENCE: english-dictionary-client
+    JWT_EXPIRES_IN: 1h
+    CORS_ORIGINS: http://localhost:3000
+    DICTIONARY_API_URL: https://api.dictionaryapi.dev
+    CACHE_LIST_TTL_SECONDS: 300
+    CACHE_DETAIL_TTL_SECONDS: 86400
+    FAVORITE_JOB_TIMEOUT_MS: 10000
+    FAVORITE_WORKER_CONCURRENCY: 5
+    WORDS_SOURCE_URL: https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json
+    IMPORT_BATCH_SIZE: 5000
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: dictionary
+      POSTGRES_USER: dictionary
+      POSTGRES_PASSWORD: dictionary
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dictionary -d dictionary']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  redis:
+    image: redis:8-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  migrate:
+    <<: *application
+    command: ['pnpm', 'db:deploy']
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *application
+    command: ['node', 'apps/api/dist/main.js']
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *application
+    command: ['node', 'apps/worker/dist/main.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  importer:
+    <<: *application
+    profiles: ['tools']
+    command: ['node', 'apps/importer/dist/main.js']
+    restart: 'no'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  redis_data:
