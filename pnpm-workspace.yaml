@@ -5,6 +5,7 @@ packages:
 allowBuilds:
   '@nestjs/core': true
   '@prisma/engines': true
+  '@scarf/scarf': false
   argon2: true
   esbuild: true
   msgpackr-extract: true

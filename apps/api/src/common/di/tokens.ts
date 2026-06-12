@@ -1,0 +1,14 @@
+export const TOKENS = {
+  environment: Symbol('environment'),
+  database: Symbol('database'),
+  redis: Symbol('redis'),
+  users: Symbol('users'),
+  words: Symbol('words'),
+  history: Symbol('history'),
+  favorites: Symbol('favorites'),
+  passwordHasher: Symbol('passwordHasher'),
+  tokens: Symbol('tokens'),
+  dictionary: Symbol('dictionary'),
+  cache: Symbol('cache'),
+  favoriteQueue: Symbol('favoriteQueue'),
+} as const;
