@@ -1,4 +1,4 @@
-import { Email, User } from '@english-dictionary/domain';
+import { Email, User, type UserProps } from '@english-dictionary/domain';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -9,6 +9,30 @@ import {
 import type { PasswordHasher, TokenIssuer } from '../ports/security.js';
 import type { CreateUserInput, UserRepository } from '../ports/user.repository.js';
 import { SignIn, SignUp } from './auth.js';
+
+class UserBuilder {
+  private props: UserProps = {
+    id: 'user-1',
+    name: 'User 1',
+    email: Email.create('user@example.com'),
+    passwordHash: 'hashed:password123',
+    createdAt: new Date('2026-06-12T12:00:00.000Z'),
+  };
+
+  withEmail(value: string): this {
+    this.props = { ...this.props, email: Email.create(value) };
+    return this;
+  }
+
+  withPasswordHash(value: string): this {
+    this.props = { ...this.props, passwordHash: value };
+    return this;
+  }
+
+  build(): User {
+    return new User(this.props);
+  }
+}
 
 class FakeUserRepository implements UserRepository {
   readonly users: User[] = [];
@@ -92,11 +116,8 @@ describe('authentication use cases', () => {
   it('signs in a user with valid credentials', async () => {
     const users = new FakeUserRepository();
     const security = createSecurity();
-    const user = await users.create({
-      name: 'User 1',
-      email: Email.create('user@example.com'),
-      passwordHash: 'hashed:password123',
-    });
+    const user = new UserBuilder().build();
+    users.users.push(user);
     const signIn = new SignIn(users, security.hasher, security.tokens);
 
     await expect(
@@ -111,11 +132,12 @@ describe('authentication use cases', () => {
   it('does not disclose whether the user or password is invalid', async () => {
     const users = new FakeUserRepository();
     const security = createSecurity();
-    await users.create({
-      name: 'User 1',
-      email: Email.create('user@example.com'),
-      passwordHash: 'hashed:password123',
-    });
+    users.users.push(
+      new UserBuilder()
+        .withEmail('user@example.com')
+        .withPasswordHash('hashed:password123')
+        .build(),
+    );
     const signIn = new SignIn(users, security.hasher, security.tokens);
 
     await expect(
