@@ -1,0 +1,35 @@
+{
+  "name": "@english-dictionary/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@english-dictionary/application": "workspace:*",
+    "@english-dictionary/contracts": "workspace:*",
+    "@english-dictionary/domain": "workspace:*",
+    "@english-dictionary/infrastructure": "workspace:*",
+    "@nestjs/common": "11.1.9",
+    "@nestjs/core": "11.1.9",
+    "@nestjs/platform-express": "11.1.9",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@english-dictionary/typescript-config": "workspace:*",
+    "@types/express": "5.0.6",
+    "@vitest/coverage-v8": "4.0.15",
+    "eslint": "9.39.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vitest": "4.0.15"
+  }
+}

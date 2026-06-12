@@ -1,0 +1,38 @@
+{
+  "name": "english-dictionary-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.3",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @english-dictionary/infrastructure prisma:generate",
+    "db:migrate": "pnpm --filter @english-dictionary/infrastructure prisma:migrate",
+    "db:deploy": "pnpm --filter @english-dictionary/infrastructure prisma:deploy",
+    "db:studio": "pnpm --filter @english-dictionary/infrastructure prisma:studio",
+    "import:words": "pnpm --filter @english-dictionary/importer start"
+  },
+  "devDependencies": {
+    "@english-dictionary/eslint-config": "workspace:*",
+    "@eslint/js": "9.39.1",
+    "@types/node": "24.10.1",
+    "eslint": "9.39.1",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.7.4",
+    "turbo": "2.9.18",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.48.1",
+    "vitest": "4.0.15"
+  }
+}

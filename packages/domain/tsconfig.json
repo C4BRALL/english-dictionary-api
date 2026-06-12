@@ -1,0 +1,7 @@
+{
+  "extends": "@english-dictionary/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}
