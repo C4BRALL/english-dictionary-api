@@ -34,4 +34,4 @@ USER node
 
 EXPOSE 3000
 
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["sh", "-c", "pnpm db:deploy && node apps/api/dist/main.js"]
