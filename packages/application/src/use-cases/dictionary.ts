@@ -43,6 +43,7 @@ export class ListWords {
 
 export class GetWordDetails {
   constructor(
+    private readonly words: WordRepository,
     private readonly dictionary: DictionaryGateway,
     private readonly history: HistoryRepository,
     private readonly cache: CacheStore,
@@ -51,6 +52,11 @@ export class GetWordDetails {
 
   async execute(userId: UserId, value: string): Promise<CachedResult<DictionaryEntry[]>> {
     const word = DictionaryWord.create(value).value;
+
+    if (!(await this.words.exists(word))) {
+      throw new ResourceNotFoundError(`Word "${word}" was not found`);
+    }
+
     const key = CacheKeys.definition(word);
     const cached = await this.cache.get<DictionaryEntry[]>(key);
 

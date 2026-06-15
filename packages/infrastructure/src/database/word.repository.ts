@@ -6,7 +6,10 @@ export class PrismaWordRepository implements WordRepository {
   constructor(private readonly database: DatabaseClient) {}
 
   async list(search: string, page: PageRequest): Promise<WordPage> {
-    const where = search ? { word: { startsWith: search } } : undefined;
+    const where = {
+      deletedAt: null,
+      ...(search ? { word: { startsWith: search } } : {}),
+    };
     const [records, total] = await this.database.$transaction([
       this.database.word.findMany({
         where,
@@ -24,7 +27,14 @@ export class PrismaWordRepository implements WordRepository {
   }
 
   async exists(word: string): Promise<boolean> {
-    return (await this.database.word.count({ where: { word } })) > 0;
+    return (
+      (await this.database.word.count({
+        where: {
+          word,
+          deletedAt: null,
+        },
+      })) > 0
+    );
   }
 
   async insertMany(words: readonly string[]): Promise<number> {
@@ -32,10 +42,19 @@ export class PrismaWordRepository implements WordRepository {
       return 0;
     }
 
-    const result = await this.database.word.createMany({
-      data: words.map((word) => ({ word })),
-      skipDuplicates: true,
-    });
+    const [, result] = await this.database.$transaction([
+      this.database.word.updateMany({
+        where: {
+          word: { in: [...words] },
+          deletedAt: { not: null },
+        },
+        data: { deletedAt: null },
+      }),
+      this.database.word.createMany({
+        data: words.map((word) => ({ word })),
+        skipDuplicates: true,
+      }),
+    ]);
 
     return result.count;
   }

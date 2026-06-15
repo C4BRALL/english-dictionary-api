@@ -79,11 +79,12 @@ describe('dictionary use cases', () => {
   });
 
   it('returns a cached definition and still records history', async () => {
+    const words = createWordRepository();
     const cache = new MemoryCache();
     await cache.set('definition:fire', [entry], 60);
     const history = createHistory();
     const gateway: DictionaryGateway = { find: vi.fn(() => Promise.resolve(null)) };
-    const useCase = new GetWordDetails(gateway, history, cache, {
+    const useCase = new GetWordDetails(words, gateway, history, cache, {
       listTtlSeconds: 60,
       detailTtlSeconds: 60,
     });
@@ -97,10 +98,11 @@ describe('dictionary use cases', () => {
   });
 
   it('proxies, caches, and records a definition on cache miss', async () => {
+    const words = createWordRepository();
     const cache = new MemoryCache();
     const history = createHistory();
     const gateway: DictionaryGateway = { find: vi.fn(() => Promise.resolve([entry])) };
-    const useCase = new GetWordDetails(gateway, history, cache, {
+    const useCase = new GetWordDetails(words, gateway, history, cache, {
       listTtlSeconds: 60,
       detailTtlSeconds: 60,
     });
@@ -113,9 +115,10 @@ describe('dictionary use cases', () => {
   });
 
   it('does not record history for an unknown word', async () => {
+    const words = createWordRepository();
     const history = createHistory();
     const gateway: DictionaryGateway = { find: vi.fn(() => Promise.resolve(null)) };
-    const useCase = new GetWordDetails(gateway, history, new MemoryCache(), {
+    const useCase = new GetWordDetails(words, gateway, history, new MemoryCache(), {
       listTtlSeconds: 60,
       detailTtlSeconds: 60,
     });
@@ -123,6 +126,23 @@ describe('dictionary use cases', () => {
     await expect(useCase.execute('user-1', 'missing')).rejects.toBeInstanceOf(
       ResourceNotFoundError,
     );
+    expect(history.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects an inactive word before cache or external lookup', async () => {
+    const words = createWordRepository();
+    vi.mocked(words.exists).mockResolvedValue(false);
+    const cache = new MemoryCache();
+    await cache.set('definition:fire', [entry], 60);
+    const history = createHistory();
+    const gateway: DictionaryGateway = { find: vi.fn(() => Promise.resolve([entry])) };
+    const useCase = new GetWordDetails(words, gateway, history, cache, {
+      listTtlSeconds: 60,
+      detailTtlSeconds: 60,
+    });
+
+    await expect(useCase.execute('user-1', 'fire')).rejects.toBeInstanceOf(ResourceNotFoundError);
+    expect(gateway.find).not.toHaveBeenCalled();
     expect(history.record).not.toHaveBeenCalled();
   });
 

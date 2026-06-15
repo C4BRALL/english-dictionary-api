@@ -10,33 +10,40 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(uuid())
+  id           String     @id @default(uuid()) @db.Uuid
   name         String     @db.VarChar(100)
   email        String     @unique @db.VarChar(254)
   passwordHash String     @map("password_hash")
   createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
   history      History[]
   favorites    Favorite[]
 
+  @@index([deletedAt])
   @@map("users")
 }
 
 model Word {
-  id        BigInt     @id @default(autoincrement())
+  id        String     @id @default(uuid()) @db.Uuid
   word      String     @unique @db.VarChar(128)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
   history   History[]
   favorites Favorite[]
 
+  @@index([deletedAt])
   @@map("words")
 }
 
 model History {
-  id     BigInt   @id @default(autoincrement())
-  userId String   @map("user_id")
-  wordId BigInt   @map("word_id")
+  id     String   @id @default(uuid()) @db.Uuid
+  userId String   @map("user_id") @db.Uuid
+  wordId String   @map("word_id") @db.Uuid
   added  DateTime @default(now())
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  word   Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  word   Word     @relation(fields: [wordId], references: [id], onDelete: Restrict)
 
   @@index([userId, added(sort: Desc)])
   @@index([wordId])
@@ -44,15 +51,18 @@ model History {
 }
 
 model Favorite {
-  id     BigInt   @id @default(autoincrement())
-  userId String   @map("user_id")
-  wordId BigInt   @map("word_id")
-  added  DateTime @default(now())
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  word   Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  wordId    String    @map("word_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  word      Word      @relation(fields: [wordId], references: [id], onDelete: Restrict)
 
   @@unique([userId, wordId])
-  @@index([userId, added(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc)])
   @@index([wordId])
+  @@index([deletedAt])
   @@map("favorites")
 }

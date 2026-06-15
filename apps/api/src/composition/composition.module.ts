@@ -134,13 +134,14 @@ class InfrastructureLifecycle implements OnApplicationShutdown {
     },
     {
       provide: GetWordDetails,
-      inject: [TOKENS.dictionary, TOKENS.history, TOKENS.cache, TOKENS.environment],
+      inject: [TOKENS.words, TOKENS.dictionary, TOKENS.history, TOKENS.cache, TOKENS.environment],
       useFactory: (
+        words: WordRepository,
         dictionary: DictionaryGateway,
         history: HistoryRepository,
         cache: CacheStore,
         environment: Environment,
-      ) => new GetWordDetails(dictionary, history, cache, environment.cache),
+      ) => new GetWordDetails(words, dictionary, history, cache, environment.cache),
     },
     {
       provide: AddFavorite,
