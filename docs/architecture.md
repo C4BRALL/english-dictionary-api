@@ -49,6 +49,8 @@ sequenceDiagram
 
   Client->>API: GET /entries/en/fire + Bearer token
   API->>UseCase: GetWordDetails(userId, fire)
+  UseCase->>DB: confirm active dictionary word
+  DB-->>UseCase: active word
   UseCase->>Cache: get definition
   alt cache hit
     Cache-->>UseCase: cached details
@@ -77,6 +79,7 @@ sequenceDiagram
   API->>Queue: add favorite.add job
   Queue->>Worker: deliver job
   Worker->>DB: upsert favorite
+  Note over Worker,DB: Restore by clearing deleted_at
   DB-->>Worker: committed
   Worker-->>Queue: completed
   Queue-->>API: waitUntilFinished
@@ -94,14 +97,15 @@ flowchart LR
   Source["words_dictionary.json"]
   Validate["Normalize and validate"]
   Batch["Batches up to 5,000"]
+  Restore["Restore matching soft-deleted words"]
   Insert["createMany + skipDuplicates"]
   Words[("words table")]
 
-  Command --> Source --> Validate --> Batch --> Insert --> Words
+  Command --> Source --> Validate --> Batch --> Restore --> Insert --> Words
 ```
 
-The unique `words.word` index and `skipDuplicates` make repeated imports
-idempotent.
+The unique `words.word` index, restoration update, and `skipDuplicates` make
+repeated imports idempotent.
 
 ## Dependency Rules
 
@@ -126,11 +130,19 @@ idempotent.
 
 ## Data Model
 
-- `users.email` is unique; only `password_hash` is persisted.
-- `words.word` is unique and has a `text_pattern_ops` prefix index.
+- All primary and foreign keys use native PostgreSQL `UUID`.
+- `users`, `words`, and `favorites` have `created_at`, `updated_at`, and
+  nullable `deleted_at` audit columns.
+- Active-record queries require `deleted_at IS NULL`.
+- `users.email` is unique and registration restores a matching deleted row.
+- `words.word` is unique, has a `text_pattern_ops` prefix index, and import
+  restores a matching deleted row.
 - `history` is append-only and indexed by user and descending timestamp.
-- `favorites` is unique by user and word for idempotency.
-- Foreign keys cascade on user or word deletion.
+- `history` intentionally does not filter its related word by `deleted_at`, so
+  recorded events remain readable.
+- `favorites` is unique by user and word; unfavorite sets `deleted_at`, while
+  favorite clears it and updates the activation timestamp.
+- Foreign keys restrict physical deletion to preserve audit evidence.
 
 ## Operational Boundaries
 
@@ -147,8 +159,12 @@ idempotent.
 1. Use page/limit pagination to match the mandatory response contract.
 2. Keep detail responses in Redis but always append history on successful views,
    including cache hits.
-3. Wait for favorite jobs with a timeout so `204` confirms persistence.
-4. Validate upstream JSON with Zod to protect the application boundary.
-5. Use Argon2id hashing; use JWT signing, not payload encryption.
-6. Avoid explicit Composite and Singleton implementations because the current
+3. Confirm that a word is active before serving cached or upstream details.
+4. Use native UUIDs for consistent identifiers across every persistence model.
+5. Soft-delete mutable records and restore them through their unique business
+   keys; keep history append-only.
+6. Wait for favorite jobs with a timeout so `204` confirms persistence.
+7. Validate upstream JSON with Zod to protect the application boundary.
+8. Use Argon2id hashing; use JWT signing, not payload encryption.
+9. Avoid explicit Composite and Singleton implementations because the current
    domain and container lifecycle do not require them.

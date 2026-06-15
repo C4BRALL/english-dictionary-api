@@ -11,6 +11,8 @@ Public repository:
 
 - NestJS REST API with JWT Bearer authentication and Argon2id password hashing.
 - PostgreSQL source of truth with idempotent import of 370,100 English words.
+- Native PostgreSQL UUIDs for every primary and foreign key.
+- Audited soft deletion for users, words, and favorites.
 - Redis cache with configurable TTL and `x-cache: HIT|MISS`.
 - BullMQ worker for idempotent favorite and unfavorite persistence.
 - OpenAPI 3 documentation at `/docs` and `/docs-json`.
@@ -93,6 +95,10 @@ Remove local database and cache volumes:
 ```bash
 docker compose down --volumes
 ```
+
+The initial migration is intentionally rewritten during this evaluation. Remove
+existing volumes before applying it when upgrading from the earlier `BIGINT`
+schema.
 
 ## Local Development
 
@@ -190,13 +196,33 @@ x-correlation-id: request UUID
 ## Import and Asynchronous Favorites
 
 The importer downloads `words_dictionary.json`, validates and normalizes each
-word, deduplicates each batch, and uses `createMany(skipDuplicates: true)`.
-A validated run processed 370,100 words; a second run inserted zero rows.
+word, deduplicates each batch, restores matching soft-deleted words, and uses
+`createMany(skipDuplicates: true)` for new records. A validated run processed
+370,100 words; a second run inserted zero rows.
 
 Favorite commands are sent to the `favorites` BullMQ queue. The API waits for
 the bounded job result so a successful `204` means the worker persisted the
 change. Jobs use retries with exponential backoff. PostgreSQL uniqueness on
-`(user_id, word_id)` makes favorite operations idempotent.
+`(user_id, word_id)` makes favorite operations idempotent. Unfavorite sets
+`deleted_at`; a later favorite restores the same row and exposes its latest
+activation through the existing public `added` field.
+
+## Persistence and Audit Policy
+
+- Every primary and foreign key uses PostgreSQL `UUID`; Prisma represents these
+  values as `String @db.Uuid`.
+- `users`, `words`, and `favorites` carry `created_at`, `updated_at`, and
+  nullable `deleted_at` audit columns.
+- Normal queries only return records where `deleted_at IS NULL`.
+- Signup restores a deleted user with the same email and replaces name and
+  password hash.
+- Import restores a deleted word with the same unique value.
+- Favorite restores a deleted `(user_id, word_id)` row; unfavorite never
+  physically deletes it.
+- `history` remains immutable and append-only. Its entries remain readable even
+  when the referenced word is soft-deleted.
+- Foreign keys use `RESTRICT` for physical deletion so audit records cannot be
+  removed accidentally.
 
 ## Security
 
@@ -268,7 +294,8 @@ YAGNI.
 - PostgreSQL is the source of truth; Redis stores only derived cache and queue
   state.
 - History is append-only because every successful detail view is meaningful.
-- Favorites use a unique database constraint and upsert/delete-many semantics.
+- Mutable records use auditable soft deletion and restoration by unique key.
+- Favorites use a unique database constraint and upsert/update-many semantics.
 - External HTTP responses are validated with Zod before entering the
   application.
 - Small Conventional Commits preserve the implementation sequence in Git

@@ -82,6 +82,21 @@ Singleton, or inheritance hierarchies solely to claim pattern usage.
 - Map domain and application errors to human-readable HTTP errors centrally.
 - Never expose stack traces, database errors, secrets, hashes, or tokens.
 
+## Persistence Rules
+
+- Use native PostgreSQL UUIDs for every primary and foreign key. In Prisma,
+  model them as `String @db.Uuid` with `@default(uuid())` on primary keys.
+- Mutable persisted entities must expose `createdAt`, `updatedAt`, and nullable
+  `deletedAt` audit fields.
+- Repository reads for mutable entities must explicitly filter
+  `deletedAt: null`.
+- Prefer soft deletion and restoration through existing unique business keys.
+  Do not physically delete users, words, or favorites.
+- Keep history immutable and append-only. Historical queries must remain
+  readable when a related mutable entity is soft-deleted.
+- Use restrictive foreign keys for audited relationships unless a documented
+  domain rule requires physical cascading deletion.
+
 ## Security and Observability
 
 - Hash passwords with Argon2id. Never store or log plaintext passwords.
