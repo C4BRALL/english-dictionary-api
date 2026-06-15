@@ -11,4 +11,5 @@ export const TOKENS = {
   dictionary: Symbol('dictionary'),
   cache: Symbol('cache'),
   favoriteQueue: Symbol('favoriteQueue'),
+  logger: Symbol('logger'),
 } as const;

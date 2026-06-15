@@ -5,10 +5,15 @@ export interface WordPage {
   total: number;
 }
 
+export interface WordWriteResult {
+  inserted: number;
+  restored: number;
+}
+
 export interface WordRepository {
   list(search: string, page: PageRequest): Promise<WordPage>;
   exists(word: string): Promise<boolean>;
-  insertMany(words: readonly string[]): Promise<number>;
+  insertMany(words: readonly string[]): Promise<WordWriteResult>;
 }
 
 export interface WordSource {

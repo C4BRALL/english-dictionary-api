@@ -1,11 +1,7 @@
-import {
-  BadRequestException,
-  ConsoleLogger,
-  type ArgumentsHost,
-  HttpException,
-} from '@nestjs/common';
+import { BadRequestException, type ArgumentsHost, HttpException } from '@nestjs/common';
 import { ConflictError } from '@english-dictionary/application';
 import { DomainValidationError } from '@english-dictionary/domain';
+import type { LogDetails, StructuredLogger } from '@english-dictionary/infrastructure';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApplicationExceptionFilter } from './application-exception.filter.js';
@@ -16,6 +12,7 @@ describe('ApplicationExceptionFilter', () => {
   const response = { status, json };
   const request = {
     correlationId: 'request-123',
+    transactionId: 'request-123',
     method: 'GET',
     originalUrl: '/entries/en/fire',
   };
@@ -25,12 +22,14 @@ describe('ApplicationExceptionFilter', () => {
       getRequest: () => request,
     }),
   } as unknown as ArgumentsHost;
-  const filter = new ApplicationExceptionFilter();
+  const logError = vi.fn<(event: string, details?: LogDetails) => void>();
+  const logWarn = vi.fn<(event: string, details?: LogDetails) => void>();
+  const logger = { error: logError, warn: logWarn } as unknown as StructuredLogger;
+  const filter = new ApplicationExceptionFilter(logger);
 
   beforeEach(() => {
     vi.clearAllMocks();
     status.mockReturnValue(response);
-    vi.spyOn(ConsoleLogger.prototype, 'error').mockImplementation(() => undefined);
   });
 
   it.each([
@@ -50,12 +49,7 @@ describe('ApplicationExceptionFilter', () => {
 
     expect(status).toHaveBeenCalledWith(500);
     expect(json).toHaveBeenCalledWith({ message: 'Internal server error' });
-    expect(ConsoleLogger.prototype.error).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: 'request_failed',
-        correlationId: 'request-123',
-        error: 'database password leaked',
-      }),
-    );
+    const failed = logError.mock.calls.find(([event]) => event === 'request_failed');
+    expect(failed?.[1]?.error).toBeInstanceOf(Error);
   });
 });

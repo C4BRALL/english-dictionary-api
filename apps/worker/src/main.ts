@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { ConsoleLogger, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
   PersistFavorite,
@@ -9,13 +9,15 @@ import {
 } from '@english-dictionary/application';
 import {
   BullMqFavoriteWorker,
+  createStructuredLogger,
   createPrismaClient,
   createRedisConnection,
   FavoriteJobRouter,
   PrismaFavoriteRepository,
   type DatabaseClient,
-  type FavoriteWorkerLogger,
+  type StructuredLogger,
 } from '@english-dictionary/infrastructure';
+import { WINSTON_MODULE_NEST_PROVIDER, WINSTON_MODULE_PROVIDER, WinstonLogger } from 'nest-winston';
 
 import { parseWorkerEnvironment, type WorkerEnvironment } from './environment.js';
 
@@ -32,12 +34,17 @@ class WorkerLifecycle implements OnApplicationShutdown {
     @Inject(TOKENS.database) private readonly database: DatabaseClient,
     @Inject(TOKENS.redis) private readonly redis: ReturnType<typeof createRedisConnection>,
     private readonly worker: BullMqFavoriteWorker,
+    @Inject(TOKENS.logger) private readonly logger: StructuredLogger,
   ) {}
 
   async onApplicationShutdown(): Promise<void> {
     await this.worker.close();
     await this.redis.quit();
     await this.database.$disconnect();
+    this.logger.info('application_stopped', {
+      response: { status: 'stopped' },
+    });
+    await this.logger.flush();
   }
 }
 
@@ -49,13 +56,31 @@ class WorkerLifecycle implements OnApplicationShutdown {
     },
     {
       provide: TOKENS.logger,
-      useFactory: (): FavoriteWorkerLogger => {
-        const logger = new ConsoleLogger('FavoriteWorker', { json: true });
-        return {
-          log: (event) => logger.log(event),
-          error: (event) => logger.error(event),
-        };
-      },
+      inject: [TOKENS.environment],
+      useFactory: (environment: WorkerEnvironment) =>
+        createStructuredLogger({
+          service: 'worker',
+          environment: environment.nodeEnv,
+          ...environment.logging,
+        }),
+    },
+  ],
+  exports: [TOKENS.environment, TOKENS.logger],
+})
+class WorkerObservabilityModule {}
+
+@Module({
+  imports: [WorkerObservabilityModule],
+  providers: [
+    {
+      provide: WINSTON_MODULE_PROVIDER,
+      inject: [TOKENS.logger],
+      useFactory: (logger: StructuredLogger) => logger.instance,
+    },
+    {
+      provide: WINSTON_MODULE_NEST_PROVIDER,
+      inject: [TOKENS.logger],
+      useFactory: (logger: StructuredLogger) => new WinstonLogger(logger.instance),
     },
     {
       provide: TOKENS.database,
@@ -94,7 +119,7 @@ class WorkerLifecycle implements OnApplicationShutdown {
       useFactory: (
         redis: ReturnType<typeof createRedisConnection>,
         processor: FavoriteJobRouter,
-        logger: FavoriteWorkerLogger,
+        logger: StructuredLogger,
         environment: WorkerEnvironment,
       ) => new BullMqFavoriteWorker(redis, processor, logger, environment.concurrency),
     },
@@ -105,9 +130,14 @@ class WorkerModule {}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.createApplicationContext(WorkerModule, {
-    logger: new ConsoleLogger({ json: true }),
+    bufferLogs: true,
   });
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
   app.enableShutdownHooks();
+  app.get<StructuredLogger>(TOKENS.logger).info('application_started', {
+    payload: { concurrency: app.get<WorkerEnvironment>(TOKENS.environment).concurrency },
+    response: { status: 'ready' },
+  });
 }
 
 void bootstrap();

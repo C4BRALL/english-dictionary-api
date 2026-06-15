@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { TokenVerifier } from '@english-dictionary/application';
+import { setTransactionUserId } from '@english-dictionary/infrastructure';
 
 import { TOKENS } from '../di/tokens.js';
 import type { AuthenticatedRequest } from '../http/request-context.js';
@@ -25,6 +26,7 @@ export class AuthGuard implements CanActivate {
 
     try {
       request.userId = await this.tokens.verify(token);
+      setTransactionUserId(request.userId);
       return true;
     } catch {
       throw new UnauthorizedException('A valid bearer token is required');

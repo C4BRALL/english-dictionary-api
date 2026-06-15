@@ -24,6 +24,7 @@ import {
 import {
   Argon2PasswordHasher,
   BullMqFavoriteQueue,
+  createStructuredLogger,
   createPrismaClient,
   createRedisConnection,
   DictionaryApiGateway,
@@ -34,6 +35,7 @@ import {
   PrismaWordRepository,
   RedisCacheStore,
   type DatabaseClient,
+  type StructuredLogger,
 } from '@english-dictionary/infrastructure';
 
 import type { Environment } from '../common/config/environment.js';
@@ -45,10 +47,15 @@ class InfrastructureLifecycle implements OnApplicationShutdown {
     @Inject(TOKENS.database) private readonly database: DatabaseClient,
     @Inject(TOKENS.redis) private readonly redis: ReturnType<typeof createRedisConnection>,
     @Inject(TOKENS.favoriteQueue) private readonly favoriteQueue: BullMqFavoriteQueue,
+    @Inject(TOKENS.logger) private readonly logger: StructuredLogger,
   ) {}
 
   async onApplicationShutdown(): Promise<void> {
     await Promise.all([this.favoriteQueue.close(), this.redis.quit(), this.database.$disconnect()]);
+    this.logger.info('application_stopped', {
+      response: { status: 'stopped' },
+    });
+    await this.logger.flush();
   }
 }
 
@@ -57,6 +64,16 @@ class InfrastructureLifecycle implements OnApplicationShutdown {
     {
       provide: TOKENS.environment,
       useFactory: () => parseEnvironment(process.env),
+    },
+    {
+      provide: TOKENS.logger,
+      inject: [TOKENS.environment],
+      useFactory: (environment: Environment) =>
+        createStructuredLogger({
+          service: 'api',
+          environment: environment.nodeEnv,
+          ...environment.logging,
+        }),
     },
     {
       provide: TOKENS.database,
@@ -99,20 +116,24 @@ class InfrastructureLifecycle implements OnApplicationShutdown {
     },
     {
       provide: TOKENS.dictionary,
-      inject: [TOKENS.environment],
-      useFactory: (environment: Environment) =>
-        new DictionaryApiGateway(environment.dictionaryApiUrl),
+      inject: [TOKENS.environment, TOKENS.logger],
+      useFactory: (environment: Environment, logger: StructuredLogger) =>
+        new DictionaryApiGateway(environment.dictionaryApiUrl, logger),
     },
     {
       provide: TOKENS.cache,
-      inject: [TOKENS.redis],
-      useFactory: (redis: ReturnType<typeof createRedisConnection>) => new RedisCacheStore(redis),
+      inject: [TOKENS.redis, TOKENS.logger],
+      useFactory: (redis: ReturnType<typeof createRedisConnection>, logger: StructuredLogger) =>
+        new RedisCacheStore(redis, logger),
     },
     {
       provide: TOKENS.favoriteQueue,
-      inject: [TOKENS.redis, TOKENS.environment],
-      useFactory: (redis: ReturnType<typeof createRedisConnection>, environment: Environment) =>
-        new BullMqFavoriteQueue(redis, environment.favoriteJobTimeoutMs),
+      inject: [TOKENS.redis, TOKENS.environment, TOKENS.logger],
+      useFactory: (
+        redis: ReturnType<typeof createRedisConnection>,
+        environment: Environment,
+        logger: StructuredLogger,
+      ) => new BullMqFavoriteQueue(redis, environment.favoriteJobTimeoutMs, logger),
     },
     {
       provide: SignUp,
@@ -182,6 +203,7 @@ class InfrastructureLifecycle implements OnApplicationShutdown {
   ],
   exports: [
     TOKENS.tokens,
+    TOKENS.logger,
     SignUp,
     SignIn,
     ListWords,

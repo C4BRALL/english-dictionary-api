@@ -7,6 +7,7 @@ export namespace FavoriteJobs {
   } as const;
 
   export interface Payload {
+    transactionId: string;
     userId: string;
     word: string;
   }

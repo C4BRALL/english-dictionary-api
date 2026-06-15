@@ -19,6 +19,9 @@ x-application: &application
     FAVORITE_WORKER_CONCURRENCY: 5
     WORDS_SOURCE_URL: https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json
     IMPORT_BATCH_SIZE: 5000
+    BETTER_STACK_SOURCE_TOKEN: ${BETTER_STACK_SOURCE_TOKEN:-}
+    BETTER_STACK_INGESTING_URL: ${BETTER_STACK_INGESTING_URL:-}
+    LOG_LEVEL: ${LOG_LEVEL:-info}
   restart: unless-stopped
 
 services:

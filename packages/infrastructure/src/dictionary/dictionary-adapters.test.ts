@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { StructuredLogger } from '../observability/structured-logger.js';
 import { DictionaryApiGateway, type Fetcher } from './dictionary-api.gateway.js';
 import { GithubWordSource } from './github-word.source.js';
+
+function createLogger(): StructuredLogger {
+  return {
+    info: vi.fn(),
+    error: vi.fn(),
+  } as unknown as StructuredLogger;
+}
 
 function response(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -31,7 +39,7 @@ describe('dictionary adapters', () => {
     );
 
     await expect(
-      new DictionaryApiGateway('https://example.test/', fetcher).find('fire'),
+      new DictionaryApiGateway('https://example.test/', createLogger(), fetcher).find('fire'),
     ).resolves.toEqual([
       {
         word: 'fire',
@@ -64,10 +72,10 @@ describe('dictionary adapters', () => {
     const failing: Fetcher = vi.fn(() => Promise.resolve(response({}, 503)));
 
     await expect(
-      new DictionaryApiGateway('https://example.test', missing).find('missing'),
+      new DictionaryApiGateway('https://example.test', createLogger(), missing).find('missing'),
     ).resolves.toBeNull();
     await expect(
-      new DictionaryApiGateway('https://example.test', failing).find('fire'),
+      new DictionaryApiGateway('https://example.test', createLogger(), failing).find('fire'),
     ).rejects.toThrow('status 503');
   });
 

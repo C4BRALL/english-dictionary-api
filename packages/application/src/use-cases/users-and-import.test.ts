@@ -88,20 +88,28 @@ describe('user and import use cases', () => {
       },
     };
     const insertedBatches: string[][] = [];
+    const progress = vi.fn();
     const words: WordRepository = {
       list: vi.fn(() => Promise.resolve({ words: [], total: 0 })),
       exists: vi.fn(() => Promise.resolve(false)),
       insertMany: vi.fn((batch: readonly string[]) => {
         insertedBatches.push([...batch]);
-        return Promise.resolve(batch.length);
+        return Promise.resolve({ inserted: batch.length, restored: 0 });
       }),
     };
 
-    await expect(new ImportWords(source, words).execute(2)).resolves.toEqual({
+    await expect(new ImportWords(source, words).execute(2, progress)).resolves.toEqual({
       processed: 4,
       inserted: 2,
+      restored: 0,
       skipped: 1,
     });
     expect(insertedBatches).toEqual([['fire'], ['water']]);
+    expect(progress).toHaveBeenLastCalledWith({
+      processed: 4,
+      inserted: 2,
+      restored: 0,
+      skipped: 1,
+    });
   });
 });

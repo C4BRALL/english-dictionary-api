@@ -1,4 +1,9 @@
-import type { PageRequest, WordPage, WordRepository } from '@english-dictionary/application';
+import type {
+  PageRequest,
+  WordPage,
+  WordRepository,
+  WordWriteResult,
+} from '@english-dictionary/application';
 
 import type { DatabaseClient } from './prisma-client.js';
 
@@ -37,12 +42,12 @@ export class PrismaWordRepository implements WordRepository {
     );
   }
 
-  async insertMany(words: readonly string[]): Promise<number> {
+  async insertMany(words: readonly string[]): Promise<WordWriteResult> {
     if (words.length === 0) {
-      return 0;
+      return { inserted: 0, restored: 0 };
     }
 
-    const [, result] = await this.database.$transaction([
+    const [restored, inserted] = await this.database.$transaction([
       this.database.word.updateMany({
         where: {
           word: { in: [...words] },
@@ -56,6 +61,9 @@ export class PrismaWordRepository implements WordRepository {
       }),
     ]);
 
-    return result.count;
+    return {
+      inserted: inserted.count,
+      restored: restored.count,
+    };
   }
 }

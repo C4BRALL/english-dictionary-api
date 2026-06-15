@@ -1,19 +1,22 @@
 import 'reflect-metadata';
 
-import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { StructuredLogger } from '@english-dictionary/infrastructure';
 import helmet from 'helmet';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 import { AppModule } from './app.module.js';
 import { parseEnvironment } from './common/config/environment.js';
-import { ApplicationExceptionFilter } from './common/http/application-exception.filter.js';
+import { TOKENS } from './common/di/tokens.js';
 
 async function bootstrap(): Promise<void> {
   const environment = parseEnvironment(process.env);
   const app = await NestFactory.create(AppModule, {
-    logger: new ConsoleLogger({ json: environment.nodeEnv !== 'development' }),
+    bufferLogs: true,
   });
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
   app.use(helmet());
   app.enableCors({
@@ -27,7 +30,6 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
     }),
   );
-  app.useGlobalFilters(new ApplicationExceptionFilter());
   app.enableShutdownHooks();
 
   const openApiConfig = new DocumentBuilder()
@@ -42,6 +44,10 @@ async function bootstrap(): Promise<void> {
   });
 
   await app.listen(environment.port, '0.0.0.0');
+  app.get<StructuredLogger>(TOKENS.logger).info('application_started', {
+    payload: { port: environment.port },
+    response: { status: 'ready' },
+  });
 }
 
 void bootstrap();

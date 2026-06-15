@@ -1,20 +1,41 @@
 import { z } from 'zod';
 
-const environmentSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
-  DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().min(1),
-  JWT_SECRET: z.string().min(32),
-  JWT_ISSUER: z.string().default('english-dictionary-api'),
-  JWT_AUDIENCE: z.string().default('english-dictionary-client'),
-  JWT_EXPIRES_IN: z.string().default('1h'),
-  CORS_ORIGINS: z.string().default('http://localhost:3000'),
-  DICTIONARY_API_URL: z.string().url().default('https://api.dictionaryapi.dev'),
-  CACHE_LIST_TTL_SECONDS: z.coerce.number().int().positive().default(300),
-  CACHE_DETAIL_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
-  FAVORITE_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
-});
+const optionalString = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().min(1).optional(),
+);
+const optionalUrl = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().url().optional(),
+);
+
+const environmentSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    PORT: z.coerce.number().int().positive().default(3000),
+    DATABASE_URL: z.string().min(1),
+    REDIS_URL: z.string().min(1),
+    JWT_SECRET: z.string().min(32),
+    JWT_ISSUER: z.string().default('english-dictionary-api'),
+    JWT_AUDIENCE: z.string().default('english-dictionary-client'),
+    JWT_EXPIRES_IN: z.string().default('1h'),
+    CORS_ORIGINS: z.string().default('http://localhost:3000'),
+    DICTIONARY_API_URL: z.string().url().default('https://api.dictionaryapi.dev'),
+    CACHE_LIST_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+    CACHE_DETAIL_TTL_SECONDS: z.coerce.number().int().positive().default(86_400),
+    FAVORITE_JOB_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    BETTER_STACK_SOURCE_TOKEN: optionalString,
+    BETTER_STACK_INGESTING_URL: optionalUrl,
+    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
+  })
+  .superRefine((value, context) => {
+    if (Boolean(value.BETTER_STACK_SOURCE_TOKEN) !== Boolean(value.BETTER_STACK_INGESTING_URL)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Better Stack source token and ingesting URL must be configured together',
+      });
+    }
+  });
 
 export interface Environment {
   nodeEnv: 'development' | 'test' | 'production';
@@ -34,6 +55,13 @@ export interface Environment {
     detailTtlSeconds: number;
   };
   favoriteJobTimeoutMs: number;
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    betterStack?: {
+      sourceToken: string;
+      ingestingUrl: string;
+    };
+  };
 }
 
 export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
@@ -59,5 +87,16 @@ export function parseEnvironment(input: NodeJS.ProcessEnv): Environment {
       detailTtlSeconds: value.CACHE_DETAIL_TTL_SECONDS,
     },
     favoriteJobTimeoutMs: value.FAVORITE_JOB_TIMEOUT_MS,
+    logging: {
+      level: value.LOG_LEVEL ?? (value.NODE_ENV === 'development' ? 'debug' : 'info'),
+      ...(value.BETTER_STACK_SOURCE_TOKEN && value.BETTER_STACK_INGESTING_URL
+        ? {
+            betterStack: {
+              sourceToken: value.BETTER_STACK_SOURCE_TOKEN,
+              ingestingUrl: value.BETTER_STACK_INGESTING_URL,
+            },
+          }
+        : {}),
+    },
   };
 }

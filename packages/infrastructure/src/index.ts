@@ -9,11 +9,22 @@ export { PrismaUserRepository } from './database/user.repository.js';
 export { PrismaWordRepository } from './database/word.repository.js';
 export { DictionaryApiGateway, type Fetcher } from './dictionary/dictionary-api.gateway.js';
 export { GithubWordSource } from './dictionary/github-word.source.js';
-export { BullMqFavoriteQueue } from './queue/bullmq-favorite.queue.js';
+export { sanitizeLogError, sanitizeLogValue } from './observability/log-sanitizer.js';
 export {
-  BullMqFavoriteWorker,
-  FavoriteJobRouter,
-  type FavoriteWorkerLogger,
-} from './queue/favorite-job.worker.js';
+  createStructuredLogger,
+  type LogDetails,
+  type LoggingSettings,
+  type LogLevel,
+  type ServiceName,
+  type StructuredLogger,
+} from './observability/structured-logger.js';
+export {
+  getTransactionContext,
+  runWithTransaction,
+  setTransactionUserId,
+  type TransactionContext,
+} from './observability/transaction-context.js';
+export { BullMqFavoriteQueue } from './queue/bullmq-favorite.queue.js';
+export { BullMqFavoriteWorker, FavoriteJobRouter } from './queue/favorite-job.worker.js';
 export { Argon2PasswordHasher } from './security/argon2-password.hasher.js';
 export { JwtTokenService, type JwtSettings } from './security/jwt-token.service.js';

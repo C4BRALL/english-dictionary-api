@@ -15,6 +15,7 @@ import {
   SignUp,
   type TokenVerifier,
 } from '@english-dictionary/application';
+import type { LogDetails, StructuredLogger } from '@english-dictionary/infrastructure';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { NextFunction, Request, Response } from 'express';
@@ -28,7 +29,7 @@ import { TOKENS } from './common/di/tokens.js';
 import { ApplicationExceptionFilter } from './common/http/application-exception.filter.js';
 import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware.js';
 import type { AuthenticatedRequest } from './common/http/request-context.js';
-import { ResponseTimeInterceptor } from './common/http/response-time.interceptor.js';
+import { RequestLoggingInterceptor } from './common/http/request-logging.interceptor.js';
 import { EntriesController } from './entries/entries.controller.js';
 import { RootController } from './root.controller.js';
 import { UsersController } from './users/users.controller.js';
@@ -46,6 +47,14 @@ describe('HTTP API', () => {
   const listHistory = { execute: vi.fn() };
   const listFavorites = { execute: vi.fn() };
   const tokens: TokenVerifier = { verify: vi.fn() };
+  const logger = {
+    instance: {} as never,
+    debug: vi.fn<(event: string, details?: LogDetails) => void>(),
+    info: vi.fn<(event: string, details?: LogDetails) => void>(),
+    warn: vi.fn<(event: string, details?: LogDetails) => void>(),
+    error: vi.fn<(event: string, details?: LogDetails) => void>(),
+    flush: vi.fn(() => Promise.resolve()),
+  } satisfies StructuredLogger;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -54,6 +63,7 @@ describe('HTTP API', () => {
       providers: [
         AuthGuard,
         { provide: TOKENS.tokens, useValue: tokens },
+        { provide: TOKENS.logger, useValue: logger },
         { provide: SignUp, useValue: signUp },
         { provide: SignIn, useValue: signIn },
         { provide: ListWords, useValue: listWords },
@@ -78,8 +88,8 @@ describe('HTTP API', () => {
         forbidNonWhitelisted: true,
       }),
     );
-    app.useGlobalFilters(new ApplicationExceptionFilter());
-    app.useGlobalInterceptors(new ResponseTimeInterceptor());
+    app.useGlobalFilters(new ApplicationExceptionFilter(logger));
+    app.useGlobalInterceptors(new RequestLoggingInterceptor(logger));
     await app.init();
   });
 
@@ -94,6 +104,7 @@ describe('HTTP API', () => {
 
     expect(response.body).toEqual({ message: 'English Dictionary' });
     expect(response.headers['x-correlation-id']).toEqual(expect.any(String));
+    expect(response.headers['x-transaction-id']).toBe(response.headers['x-correlation-id']);
     expect(response.headers['x-response-time']).toMatch(/^\d+\.\d{2}ms$/);
   });
 
@@ -133,6 +144,24 @@ describe('HTTP API', () => {
       token: 'Bearer signed-token',
     });
     expect(response.body).not.toHaveProperty('password');
+    expect(logger.info).toHaveBeenCalledWith(
+      'request_started',
+      expect.objectContaining({
+        payload: {
+          operation: 'signup',
+          fields: ['email', 'name', 'password'],
+        },
+      }),
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      'request_completed',
+      expect.objectContaining({
+        response: {
+          id: 'user-1',
+          bearerIssued: true,
+        },
+      }),
+    );
   });
 
   it('signs in an existing user', async () => {
@@ -175,6 +204,13 @@ describe('HTTP API', () => {
     expect(tokens.verify).toHaveBeenCalledWith('signed-token');
     expect(getWordDetails.execute).toHaveBeenCalledWith('user-1', 'fire');
     expect(response.headers['x-cache']).toBe('HIT');
+    const completed = logger.info.mock.calls.find(([event]) => event === 'request_completed');
+    expect(completed?.[1]?.cacheStatus).toBe('HIT');
+    expect(completed?.[1]?.response).toMatchObject({
+      word: 'fire',
+      entries: 1,
+      meanings: 0,
+    });
   });
 
   it('lists words and preserves a valid correlation id', async () => {
@@ -191,10 +227,11 @@ describe('HTTP API', () => {
       },
     });
 
+    const transactionId = '11111111-1111-4111-8111-111111111111';
     const response = await request(app.getHttpServer() as Server)
       .get('/entries/en?search=fi&page=1&limit=10')
       .set('authorization', 'Bearer signed-token')
-      .set('x-correlation-id', 'request-123')
+      .set('x-correlation-id', transactionId)
       .expect(200);
 
     expect(listWords.execute).toHaveBeenCalledWith('fi', {
@@ -203,7 +240,8 @@ describe('HTTP API', () => {
       limit: '10',
     });
     expect(response.headers['x-cache']).toBe('MISS');
-    expect(response.headers['x-correlation-id']).toBe('request-123');
+    expect(response.headers['x-correlation-id']).toBe(transactionId);
+    expect(response.headers['x-transaction-id']).toBe(transactionId);
   });
 
   it('dispatches favorite and unfavorite commands', async () => {

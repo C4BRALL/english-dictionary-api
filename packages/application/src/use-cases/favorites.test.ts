@@ -11,7 +11,7 @@ function createWords(exists: boolean): WordRepository {
   return {
     list: vi.fn(() => Promise.resolve({ words: [], total: 0 })),
     exists: vi.fn(() => Promise.resolve(exists)),
-    insertMany: vi.fn(() => Promise.resolve(0)),
+    insertMany: vi.fn(() => Promise.resolve({ inserted: 0, restored: 0 })),
   };
 }
 

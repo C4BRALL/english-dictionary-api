@@ -34,7 +34,7 @@ function createWordRepository(): WordRepository {
   return {
     list: vi.fn(() => Promise.resolve({ words: ['fire', 'firefly'], total: 2 })),
     exists: vi.fn(() => Promise.resolve(true)),
-    insertMany: vi.fn(() => Promise.resolve(0)),
+    insertMany: vi.fn(() => Promise.resolve({ inserted: 0, restored: 0 })),
   };
 }
 
@@ -159,7 +159,7 @@ describe('dictionary use cases', () => {
     const words: WordRepository = {
       list: vi.fn(() => Promise.resolve({ words: expected.results, total: expected.totalDocs })),
       exists: vi.fn(() => Promise.resolve(true)),
-      insertMany: vi.fn(() => Promise.resolve(0)),
+      insertMany: vi.fn(() => Promise.resolve({ inserted: 0, restored: 0 })),
     };
 
     await expect(

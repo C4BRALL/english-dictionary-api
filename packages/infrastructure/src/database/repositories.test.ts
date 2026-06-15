@@ -123,7 +123,10 @@ describe('PrismaWordRepository', () => {
       $transaction: transaction,
     } as unknown as DatabaseClient);
 
-    await expect(repository.insertMany(['fire', 'firefly'])).resolves.toBe(2);
+    await expect(repository.insertMany(['fire', 'firefly'])).resolves.toEqual({
+      inserted: 2,
+      restored: 1,
+    });
 
     expect(updateMany).toHaveBeenCalledWith({
       where: {

@@ -18,10 +18,15 @@ export { createPageResult, type PageRequest, type PageResult } from './models/pa
 export { type FavoriteRepository, type HistoryRepository } from './ports/activity.repositories.js';
 export type { CacheStore } from './ports/cache.store.js';
 export type { DictionaryGateway } from './ports/dictionary.gateway.js';
-export type { FavoriteQueue } from './ports/favorite.queue.js';
+export type { FavoriteCommandPayload, FavoriteQueue } from './ports/favorite.queue.js';
 export type { PasswordHasher, TokenIssuer, TokenVerifier } from './ports/security.js';
 export type { CreateUserInput, UserRepository } from './ports/user.repository.js';
-export type { WordPage, WordRepository, WordSource } from './ports/word.repository.js';
+export type {
+  WordPage,
+  WordRepository,
+  WordSource,
+  WordWriteResult,
+} from './ports/word.repository.js';
 export { CacheKeys } from './services/cache-keys.js';
 export { validateName, validatePage, validatePassword } from './services/validation.js';
 export {
@@ -38,5 +43,9 @@ export {
   PersistUnfavorite,
   RemoveFavorite,
 } from './use-cases/favorites.js';
-export { ImportWords, type ImportWordsResult } from './use-cases/import-words.js';
+export {
+  ImportWords,
+  type ImportProgressObserver,
+  type ImportWordsResult,
+} from './use-cases/import-words.js';
 export { GetUserProfile, ListFavorites, ListHistory } from './use-cases/users.js';

@@ -5,8 +5,11 @@ import type { WordRepository, WordSource } from '../ports/word.repository.js';
 export interface ImportWordsResult {
   processed: number;
   inserted: number;
+  restored: number;
   skipped: number;
 }
+
+export type ImportProgressObserver = (progress: ImportWordsResult) => void;
 
 export class ImportWords {
   constructor(
@@ -14,9 +17,13 @@ export class ImportWords {
     private readonly words: WordRepository,
   ) {}
 
-  async execute(batchSize = 5_000): Promise<ImportWordsResult> {
+  async execute(
+    batchSize = 5_000,
+    onProgress?: ImportProgressObserver,
+  ): Promise<ImportWordsResult> {
     let processed = 0;
     let inserted = 0;
+    let restored = 0;
     let skipped = 0;
 
     for await (const batch of this.source.batches(batchSize)) {
@@ -35,9 +42,12 @@ export class ImportWords {
         }
       }
 
-      inserted += await this.words.insertMany([...normalized]);
+      const result = await this.words.insertMany([...normalized]);
+      inserted += result.inserted;
+      restored += result.restored;
+      onProgress?.({ processed, inserted, restored, skipped });
     }
 
-    return { processed, inserted, skipped };
+    return { processed, inserted, restored, skipped };
   }
 }
