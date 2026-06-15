@@ -1,4 +1,4 @@
-# English Dictionary API
+# English Dictionary API [![Better Stack Badge](https://uptime.betterstack.com/status-badges/v1/monitor/2p51q.svg)](https://uptime.betterstack.com/?utm_source=status_badge)
 
 Backend solution for the Flora Energia software engineering challenge. The API
 authenticates users, lists English words, proxies word details from the Free
