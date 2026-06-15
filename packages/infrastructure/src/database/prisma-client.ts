@@ -5,6 +5,9 @@ import { PrismaClient } from '../generated/prisma/client.js';
 export function createPrismaClient(databaseUrl: string): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: databaseUrl,
+    ssl: {
+      rejectUnauthorized: false,
+    },
   });
 
   return new PrismaClient({ adapter });

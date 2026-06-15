@@ -21,7 +21,7 @@
     "db:migrate": "pnpm --filter @english-dictionary/infrastructure prisma:migrate",
     "db:deploy": "pnpm --filter @english-dictionary/infrastructure prisma:deploy",
     "db:studio": "pnpm --filter @english-dictionary/infrastructure prisma:studio",
-    "import:words": "pnpm --filter @english-dictionary/importer import"
+    "import:words": "pnpm --filter @english-dictionary/importer run import"
   },
   "devDependencies": {
     "@english-dictionary/eslint-config": "workspace:*",
