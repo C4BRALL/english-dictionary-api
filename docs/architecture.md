@@ -18,6 +18,7 @@ flowchart TD
   Contracts["packages/contracts<br/>BullMQ job contracts"]
   PostgreSQL[("PostgreSQL 18")]
   Redis[("Redis 8")]
+  BetterStack[("Better Stack Logs")]
   Dictionary["Free Dictionary API"]
   WordSource["GitHub word source"]
 
@@ -30,6 +31,7 @@ flowchart TD
   Application --> Contracts
   Infrastructure --> PostgreSQL
   Infrastructure --> Redis
+  Infrastructure --> BetterStack
   Infrastructure --> Dictionary
   Infrastructure --> WordSource
 ```
@@ -74,10 +76,11 @@ sequenceDiagram
   participant Worker
   participant DB as PostgreSQL
 
-  Client->>API: POST /entries/en/fire/favorite
+  Client->>API: POST /entries/en/fire/favorite + transaction headers
   API->>DB: confirm dictionary word exists
-  API->>Queue: add favorite.add job
+  API->>Queue: add favorite.add job + transactionId
   Queue->>Worker: deliver job
+  Note over API,Worker: Winston events share transactionId
   Worker->>DB: upsert favorite
   Note over Worker,DB: Restore by clearing deleted_at
   DB-->>Worker: committed
@@ -88,6 +91,34 @@ sequenceDiagram
 
 The bounded wait preserves the challenge's synchronous HTTP expectation while
 the persistence mechanism remains asynchronous and independently scalable.
+
+## Observability Flow
+
+```mermaid
+flowchart LR
+  Client["HTTP client"]
+  API["API<br/>AsyncLocalStorage"]
+  Queue["BullMQ payload"]
+  Worker["Worker<br/>restored context"]
+  Importer["Importer<br/>execution context"]
+  Console["JSON stdout"]
+  BetterStack["Better Stack source<br/>english-dictionary-api"]
+
+  Client -->|"x-transaction-id"| API
+  API -->|"transactionId"| Queue --> Worker
+  API --> Console
+  Worker --> Console
+  Importer --> Console
+  API --> BetterStack
+  Worker --> BetterStack
+  Importer --> BetterStack
+```
+
+Winston enriches events with service, environment, transaction, payload,
+response, duration, and error metadata. A shared sanitizer redacts secrets and
+bounds event size before either transport receives the event. Better Stack is
+an optional observability sink; stdout remains available if remote ingestion is
+not configured or is unavailable.
 
 ## Import Flow
 
@@ -152,7 +183,10 @@ repeated imports idempotent.
 - Cache TTL values, worker concurrency, endpoints, and credentials are
   environment-driven.
 - Logs are structured JSON in production and exclude passwords and tokens.
-- Correlation IDs are accepted from trusted callers or generated per request.
+- Transaction UUIDs are accepted through `x-transaction-id`, fall back to
+  `x-correlation-id`, or are generated per request.
+- BullMQ jobs carry the transaction UUID so API and worker events are
+  queryable as one flow.
 
 ## Key Decisions
 
@@ -168,3 +202,5 @@ repeated imports idempotent.
 8. Use Argon2id hashing; use JWT signing, not payload encryption.
 9. Avoid explicit Composite and Singleton implementations because the current
    domain and container lifecycle do not require them.
+10. Use Winston with console and Better Stack transports while keeping remote
+    logging outside the business-operation success path.

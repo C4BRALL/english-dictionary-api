@@ -18,6 +18,7 @@ Public repository:
 - OpenAPI 3 documentation at `/docs` and `/docs-json`.
 - Structured logs, correlation IDs, response timing, Helmet, CORS allowlist,
   throttling, and global validation.
+- Winston transports for JSON stdout and Better Stack live log ingestion.
 - Unit, adapter, and HTTP tests with enforced coverage thresholds.
 - Docker Compose runtime and GitHub Actions CI.
 
@@ -130,6 +131,9 @@ Important environment variables:
 | `WORDS_SOURCE_URL`            | Dictionary JSON source                    | GitHub raw URL                  |
 | `IMPORT_BATCH_SIZE`           | Import batch size                         | `5000`                          |
 | `FAVORITE_WORKER_CONCURRENCY` | BullMQ concurrency                        | `5`                             |
+| `BETTER_STACK_SOURCE_TOKEN`   | Better Stack source credential            | optional                        |
+| `BETTER_STACK_INGESTING_URL`  | Better Stack ingestion endpoint           | optional                        |
+| `LOG_LEVEL`                   | Minimum Winston log level                 | `debug` dev, `info` production  |
 
 ## API Contract
 
@@ -190,15 +194,47 @@ Repeated list and detail requests expose:
 ```text
 x-cache: HIT
 x-response-time: 5.25ms
+x-transaction-id: request UUID
 x-correlation-id: request UUID
 ```
+
+`x-transaction-id` is the canonical identifier. The legacy
+`x-correlation-id` remains supported and both response headers contain the same
+UUID.
+
+## Logging and Transaction Tracing
+
+API, worker, and importer share one Better Stack source and distinguish events
+with `service: api|worker|importer`. Winston always writes structured JSON to
+stdout and adds the Better Stack transport only when both credential variables
+are configured.
+
+Each event includes `event`, `service`, `environment`, `timestamp`, and the
+current `transactionId`. Authenticated flows may include `userId`. HTTP
+requests, BullMQ jobs, external dictionary calls, cache operations, and imports
+record sanitized payloads, responses, durations, and errors.
+
+Sensitive fields such as passwords, hashes, authorization headers, cookies,
+tokens, secrets, and credential-bearing URLs are redacted. Values are bounded
+to six object levels, 20 array items, 2,000 characters per string, and 16 KiB
+per payload or response.
+
+The API propagates its transaction UUID in the BullMQ payload so one Better
+Stack query can follow a favorite operation from request to worker completion.
+The importer creates one transaction UUID for each execution.
+
+The configured source is `english-dictionary-api` (ID `2521037`) in the
+Germany region. The account accepted 3 days of log retention; the requested
+30-day retention is not available on the current Better Stack plan.
 
 ## Import and Asynchronous Favorites
 
 The importer downloads `words_dictionary.json`, validates and normalizes each
 word, deduplicates each batch, restores matching soft-deleted words, and uses
-`createMany(skipDuplicates: true)` for new records. A validated run processed
-370,100 words; a second run inserted zero rows.
+`createMany(skipDuplicates: true)` for new records. Progress logs expose
+processed, inserted, restored, and skipped counts without logging the complete
+word list. A validated run processed 370,100 words; a second run inserted zero
+rows.
 
 Favorite commands are sent to the `favorites` BullMQ queue. The API waits for
 the bounded job result so a successful `204` means the worker persisted the
@@ -238,6 +274,8 @@ activation through the existing public `added` field.
 - DTO validation rejects unknown fields.
 - Error responses hide stack traces and infrastructure details.
 - Correlation IDs connect requests to structured error logs.
+- Payload and response logging is recursively sanitized and size-limited.
+- Better Stack failures never determine the success of business operations.
 
 ## Tests and Quality
 

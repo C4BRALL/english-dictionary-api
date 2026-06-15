@@ -106,7 +106,15 @@ Singleton, or inheritance hierarchies solely to claim pattern usage.
 - Configure Helmet, CORS allowlists, authentication rate limits, and request
   validation.
 - Add a correlation ID to requests and structured logs.
+- Use `transactionId` as the canonical trace field and propagate it through
+  asynchronous jobs. Keep `x-correlation-id` only as a compatible HTTP alias.
 - Redact authorization headers, cookies, passwords, hashes, and tokens.
+- Route application logs through the shared Winston adapter. Do not call
+  `console.*`, instantiate ad hoc loggers, or send directly to Better Stack.
+- Payloads, responses, and errors must pass through the shared recursive
+  sanitizer and its depth, array, string, and serialized-size limits.
+- Logging and Better Stack ingestion must never determine whether a business
+  operation succeeds.
 - Return human-readable errors while retaining diagnostic context in server
   logs.
 - Add `x-response-time` to API responses and `x-cache` to cacheable endpoints.
